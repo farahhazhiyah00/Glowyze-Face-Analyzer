@@ -11,7 +11,7 @@ TUGASMU:
 4. Berikan edukasi tentang gaya hidup sehat untuk kulit.
 5. SELALU berikan disclaimer bahwa kamu adalah AI, bukan pengganti Dermatolog jika ada masalah serius.
 
-Gunakan Bahasa Indonesia yang hangat. Tambahkan emoji sesekali ✨.`;
+Gunakan Bahasa Indonesia yang hangat. Tambahkan emoji sesekali â¨.`;
 
 const VISION_PROMPT = `Analisis foto wajah ini sebagai AI Glowy (pakar AI kecantikan). 
 Berikan laporan yang meliputi:
@@ -37,7 +37,7 @@ export class GeminiService {
   private chatSession: Chat | null = null;
 
   constructor() {
-    this.ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+    this.ai = new GoogleGenAI({ apiKey: process.env.API_KEY || 'FAKE_API_KEY_FOR_DEVELOPMENT' });
   }
 
   public async startChat(userProfile?: UserProfile, historyMessages?: ChatMessage[]) {
@@ -62,10 +62,10 @@ export class GeminiService {
     if (!this.chatSession) await this.startChat();
     try {
       const result = await this.chatSession!.sendMessage({ message });
-      return result.text || "Duh, Glowy lagi ngelamun sebentar. Bisa ulangi? ✨";
+      return result.text || "Duh, Glowy lagi ngelamun sebentar. Bisa ulangi? â¨";
     } catch (e) {
       console.error(e);
-      return "Sinyal Glowy lagi kurang stabil nih bestie, coba lagi ya! 🌸";
+      return "Sinyal Glowy lagi kurang stabil nih bestie, coba lagi ya! ð¸";
     }
   }
 
