@@ -1,0 +1,7 @@
+{
+  "name": "Glowyze face analyzer Web",
+  "description": "AI-powered skincare website featuring face analysis, personalized recommendations, and an intelligent skincare assistant.",
+  "requestFramePermissions": [
+    "camera"
+  ]
+}
