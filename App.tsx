@@ -92,7 +92,7 @@ const Layout: React.FC<{ children: React.ReactNode, onNavigate: (p: string) => v
       
       {/* Mobile Bottom Navigation - Sticky at bottom */}
       {!hideNav && (
-        <nav className="md:hidden bg-white/95 dark:bg-galaxy/95 backdrop-blur-xl border-t border-ocean-french/30 dark:border-planetary/30 px-6 pb-safe pt-2 flex justify-between items-center z-50 shadow-[0_-10px_40px_rgba(0,0,0,0.03)] shrink-0 h-20">
+        <nav className="md:hidden bg-white/95 dark:bg-galaxy/95 backdrop-blur-xl border-t border-ocean-french/30 dark:border-planetary/30 px-6 pb-safe pt-2 flex justify-between items-center z-50 shadow-[0_-10px_40px_rgba(0,0,0,0.03)] shrink-0 h-[calc(4rem+env(safe-area-inset-bottom))]">
           <NavItem to="/recommendations" icon={FlaskConical} label="Care" active={location.pathname === '/recommendations'} onClick={onNavigate} />
           <NavItem to="/history" icon={BarChart2} label="Track" active={location.pathname === '/history'} onClick={onNavigate} />
           
