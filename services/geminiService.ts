@@ -15,12 +15,16 @@ TUGASMU:
 Gunakan Bahasa Indonesia yang hangat. Tambahkan emoji sesekali ✨.`;
 
 const VISION_PROMPT = `Analisis foto wajah ini dengan presisi tingkat tinggi sebagai AI Glowy (Advanced Beauty Expert). 
-Lakukan deteksi visual mendalam terhadap pori-pori, hiperpigmentasi, garis halus, dan lesi jerawat. Berikan analisis dalam format JSON.`;
+
+KETENTUAN SKALA (0-100):
+- Untuk metrics (acne, wrinkles, pigmentation, texture): 0 berarti kulit sangat bersih/sehat, 100 berarti kondisi sangat parah/berat.
+- Untuk overallScore: 100 berarti kulit secara keseluruhan sangat sehat, 0 berarti banyak masalah serius.
+
+Berikan analisis dalam format JSON. Summary harus merujuk langsung pada angka metrics yang ditemukan dan memberikan saran spesifik yang sinkron dengan angka tersebut dalam Bahasa Indonesia.`;
 
 export class GeminiService {
   private chatSession: Chat | null = null;
 
-  // Tidak lagi menginisialisasi AI di constructor untuk mematuhi aturan model Pro
   constructor() {}
 
   private getAIInstance() {
@@ -40,10 +44,9 @@ export class GeminiService {
 
     const ai = this.getAIInstance();
     this.chatSession = ai.chats.create({
-      model: 'gemini-3-pro-preview',
+      model: 'gemini-3-flash-preview',
       config: { 
-        systemInstruction: instruction,
-        thinkingConfig: { thinkingBudget: 4000 }
+        systemInstruction: instruction
       },
       history
     });
@@ -56,9 +59,6 @@ export class GeminiService {
       return result.text || "Glowy sedang memproses datamu... ✨";
     } catch (e: any) {
       console.error("Chat Error:", e);
-      if (e.message?.includes("Requested entity was not found")) {
-        throw new Error("MODEL_NOT_FOUND");
-      }
       return "Sinyal Glowy lagi kurang stabil nih bestie, coba lagi ya! 🌸";
     }
   }
@@ -69,7 +69,7 @@ export class GeminiService {
       const cleanBase64 = base64Image.split(',')[1] || base64Image;
       
       const response = await ai.models.generateContent({
-        model: 'gemini-3-pro-preview',
+        model: 'gemini-3-flash-preview',
         contents: {
           parts: [
             { inlineData: { mimeType: 'image/jpeg', data: cleanBase64 } },
@@ -94,8 +94,7 @@ export class GeminiService {
               summary: { type: Type.STRING }
             },
             required: ["overallScore", "metrics", "summary"]
-          },
-          thinkingConfig: { thinkingBudget: 32768 }
+          }
         }
       });
 
@@ -108,14 +107,11 @@ export class GeminiService {
         imageUri: base64Image,
         overallScore: data.overallScore || 70,
         metrics: data.metrics || { acne: 10, wrinkles: 5, pigmentation: 10, texture: 15 },
-        summary: data.summary || "Analisis Pro selesai. Tetap semangat merawat kulit ya!"
+        summary: data.summary || "Analisis selesai. Tetap semangat merawat kulit ya!"
       };
     } catch (e: any) {
       console.error("Analysis Failed:", e);
-      if (e.message?.includes("Requested entity was not found")) {
-        throw new Error("MODEL_NOT_FOUND");
-      }
-      throw new Error("Gagal menganalisis gambar. Pastikan pencahayaan cukup.");
+      throw new Error("Gagal menganalisis gambar. Pastikan pencahayaan cukup dan foto wajah terlihat jelas.");
     }
   }
 }

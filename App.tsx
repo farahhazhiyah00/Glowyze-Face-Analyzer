@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { HashRouter as Router, Routes, Route, useNavigate, useLocation } from 'react-router-dom';
 import { Onboarding } from './components/Onboarding';
@@ -138,16 +139,43 @@ const AppContent = () => {
 
   useEffect(() => {
     if (userProfile?.theme === 'dark') document.documentElement.classList.add('dark');
-  }, []);
+  }, [userProfile]);
+
+  const handleAuthComplete = (email: string) => {
+    // Simpan email ke profile dan lanjut ke onboarding
+    const newProfile = { 
+      ...(userProfile || {}), 
+      email, 
+      isOnboarded: false 
+    } as UserProfile;
+    updateProfile(newProfile);
+    setAppState('ONBOARDING');
+  };
+
+  const handleOnboardingComplete = (profile: UserProfile) => {
+    updateProfile(profile);
+    setAppState('HOME');
+  };
+
+  const handleSplashFinish = () => {
+    if (userProfile?.isOnboarded) {
+      setAppState('HOME');
+    } else if (userProfile?.email) {
+      // Jika email sudah ada tapi belum selesai onboarding
+      setAppState('ONBOARDING');
+    } else {
+      setAppState('AUTH');
+    }
+  };
 
   return (
     <>
       <WaveOverlay active={waveActive} />
       <Bubbles />
       
-      {appState === 'SPLASH' && <SplashScreen onFinish={() => setAppState(userProfile?.isOnboarded ? 'HOME' : 'AUTH')} />}
-      {appState === 'AUTH' && <AuthScreen onComplete={() => setAppState('ONBOARDING')} />}
-      {appState === 'ONBOARDING' && <Onboarding onComplete={(p) => { updateProfile(p); setAppState('HOME'); }} />}
+      {appState === 'SPLASH' && <SplashScreen onFinish={handleSplashFinish} />}
+      {appState === 'AUTH' && <AuthScreen onComplete={handleAuthComplete} />}
+      {appState === 'ONBOARDING' && <Onboarding onComplete={handleOnboardingComplete} />}
       
       {appState === 'HOME' && userProfile && (
         <Layout onNavigate={handleNavigate}>
