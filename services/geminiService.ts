@@ -18,12 +18,13 @@ const VISION_PROMPT = `Analisis foto wajah ini dengan presisi tingkat tinggi seb
 Lakukan deteksi visual mendalam terhadap pori-pori, hiperpigmentasi, garis halus, dan lesi jerawat. Berikan analisis dalam format JSON.`;
 
 export class GeminiService {
-  private ai: GoogleGenAI;
   private chatSession: Chat | null = null;
 
-  constructor() {
-    // Fix: Initialize GoogleGenAI using process.env.API_KEY directly as per guidelines.
-    this.ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+  // Tidak lagi menginisialisasi AI di constructor untuk mematuhi aturan model Pro
+  constructor() {}
+
+  private getAIInstance() {
+    return new GoogleGenAI({ apiKey: process.env.API_KEY });
   }
 
   public async startChat(userProfile?: UserProfile, historyMessages?: ChatMessage[]) {
@@ -37,7 +38,8 @@ export class GeminiService {
       parts: [{ text: msg.text }]
     })) || [];
 
-    this.chatSession = this.ai.chats.create({
+    const ai = this.getAIInstance();
+    this.chatSession = ai.chats.create({
       model: 'gemini-3-pro-preview',
       config: { 
         systemInstruction: instruction,
@@ -51,19 +53,22 @@ export class GeminiService {
     if (!this.chatSession) await this.startChat();
     try {
       const result = await this.chatSession!.sendMessage({ message });
-      // Fix: Access response.text directly as a property (not a method).
       return result.text || "Glowy sedang memproses datamu... ✨";
-    } catch (e) {
+    } catch (e: any) {
       console.error("Chat Error:", e);
+      if (e.message?.includes("Requested entity was not found")) {
+        throw new Error("MODEL_NOT_FOUND");
+      }
       return "Sinyal Glowy lagi kurang stabil nih bestie, coba lagi ya! 🌸";
     }
   }
 
   public async analyzeSkin(base64Image: string): Promise<ScanResult> {
+    const ai = this.getAIInstance();
     try {
       const cleanBase64 = base64Image.split(',')[1] || base64Image;
       
-      const response = await this.ai.models.generateContent({
+      const response = await ai.models.generateContent({
         model: 'gemini-3-pro-preview',
         contents: {
           parts: [
@@ -94,7 +99,6 @@ export class GeminiService {
         }
       });
 
-      // Fix: Access response.text directly as a property.
       const responseText = response.text || "{}";
       const data = JSON.parse(responseText);
       
@@ -106,8 +110,11 @@ export class GeminiService {
         metrics: data.metrics || { acne: 10, wrinkles: 5, pigmentation: 10, texture: 15 },
         summary: data.summary || "Analisis Pro selesai. Tetap semangat merawat kulit ya!"
       };
-    } catch (e) {
+    } catch (e: any) {
       console.error("Analysis Failed:", e);
+      if (e.message?.includes("Requested entity was not found")) {
+        throw new Error("MODEL_NOT_FOUND");
+      }
       throw new Error("Gagal menganalisis gambar. Pastikan pencahayaan cukup.");
     }
   }

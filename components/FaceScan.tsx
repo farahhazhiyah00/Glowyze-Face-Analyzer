@@ -1,15 +1,27 @@
 
 import React, { useRef, useState, useCallback, useEffect } from 'react';
-import { RefreshCw, X, AlertCircle, Upload, ArrowRight, ShieldCheck, Info, SwitchCamera } from 'lucide-react';
+import { RefreshCw, X, AlertCircle, Upload, ArrowRight, ShieldCheck, Info, SwitchCamera, Key, Lock } from 'lucide-react';
 import { ScanResult } from '../types';
 import { geminiService } from '../services/geminiService';
+
+// Fix: Declarations for window.aistudio must match the environment's predefined AIStudio type and modifiers.
+declare global {
+  interface AIStudio {
+    hasSelectedApiKey: () => Promise<boolean>;
+    openSelectKey: () => Promise<void>;
+  }
+
+  interface Window {
+    readonly aistudio: AIStudio;
+  }
+}
 
 interface FaceScanProps {
   onScanComplete: (result: ScanResult) => void;
   onClose: () => void;
 }
 
-type ScanView = 'CAMERA' | 'SCANNING' | 'REVIEW';
+type ScanView = 'CAMERA' | 'SCANNING' | 'REVIEW' | 'KEY_REQUIRED';
 
 export const FaceScan: React.FC<FaceScanProps> = ({ onScanComplete, onClose }) => {
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -25,6 +37,27 @@ export const FaceScan: React.FC<FaceScanProps> = ({ onScanComplete, onClose }) =
   const [facingMode, setFacingMode] = useState<'user' | 'environment'>('user');
   
   const isMounted = useRef(true);
+
+  // Check if API Key is selected for Pro models
+  useEffect(() => {
+    const checkKey = async () => {
+      if (window.aistudio) {
+        const hasKey = await window.aistudio.hasSelectedApiKey();
+        if (!hasKey) {
+          setView('KEY_REQUIRED');
+        }
+      }
+    };
+    checkKey();
+  }, []);
+
+  const handleOpenKeySelector = async () => {
+    if (window.aistudio) {
+      await window.aistudio.openSelectKey();
+      // Assume success as per guidelines to avoid race condition
+      setView('CAMERA');
+    }
+  };
 
   const stopCamera = useCallback(() => {
     if (streamRef.current) {
@@ -71,7 +104,7 @@ export const FaceScan: React.FC<FaceScanProps> = ({ onScanComplete, onClose }) =
     } catch (err: any) {
       console.error("Camera access error:", err);
       if (isMounted.current) {
-        setError('Gagal mengakses kamera. Silakan berikan izin atau unggah foto secara manual.');
+        setError('Gagal mengakses kamera. Pastikan koneksi menggunakan HTTPS dan berikan izin kamera.');
         setIsStreaming(false);
       }
     }
@@ -134,11 +167,16 @@ export const FaceScan: React.FC<FaceScanProps> = ({ onScanComplete, onClose }) =
         setAnalysisResult(result);
         setView('REVIEW');
       }
-    } catch (e) {
+    } catch (e: any) {
       console.error("Analysis failed", e);
       if (isMounted.current) {
-        setError("Gagal menganalisis. Coba foto lain dengan pencahayaan yang lebih baik.");
-        setView('CAMERA');
+        if (e.message === "MODEL_NOT_FOUND") {
+          setView('KEY_REQUIRED');
+          setError("Model Pro memerlukan konfigurasi ulang kunci API.");
+        } else {
+          setError("Gagal menganalisis. Coba foto lain dengan pencahayaan yang lebih baik.");
+          setView('CAMERA');
+        }
       }
     }
   };
@@ -182,17 +220,50 @@ export const FaceScan: React.FC<FaceScanProps> = ({ onScanComplete, onClose }) =
     });
   };
 
-  if (error) {
+  if (view === 'KEY_REQUIRED') {
+    return (
+      <div className="flex flex-col items-center justify-center h-full p-8 text-center bg-ocean-pattens dark:bg-galaxy animate-fadeIn">
+        <div className="w-20 h-20 bg-ocean-curious/10 rounded-3xl flex items-center justify-center mb-6 border border-ocean-curious/20">
+          <Lock className="text-ocean-curious" size={40} />
+        </div>
+        <h3 className="text-2xl font-heading font-bold mb-3 text-ocean-venice dark:text-meteor">Buka Analisis Pro</h3>
+        <p className="text-ocean-venice/60 dark:text-meteor/60 mb-8 max-w-sm leading-relaxed">
+          Untuk menggunakan fitur analisis wajah **Gemini 3 Pro**, Anda perlu menghubungkan kunci API dari proyek GCP yang memiliki penagihan aktif.
+        </p>
+        <button 
+          onClick={handleOpenKeySelector}
+          className="w-full max-w-xs py-4 bg-ocean-curious dark:bg-planetary text-white dark:text-meteor rounded-full font-bold flex items-center justify-center gap-2 shadow-lg hover:bg-ocean-venice transition-all active:scale-95"
+        >
+          <Key size={20} />
+          Hubungkan Kunci API
+        </button>
+        <a 
+          href="https://ai.google.dev/gemini-api/docs/billing" 
+          target="_blank" 
+          rel="noopener noreferrer"
+          className="mt-6 text-sm text-ocean-curious hover:underline font-medium"
+        >
+          Pelajari tentang Billing API
+        </a>
+        <button onClick={onClose} className="mt-8 text-ocean-venice/50 dark:text-universe/50 font-medium">Batal</button>
+      </div>
+    );
+  }
+
+  if (error && view === 'CAMERA') {
     return (
       <div className="flex flex-col items-center justify-center h-full p-6 text-center bg-ocean-pattens dark:bg-galaxy">
         <div className="w-20 h-20 bg-red-50 dark:bg-red-900/20 rounded-full flex items-center justify-center mb-6">
           <AlertCircle className="text-red-500" size={40} />
         </div>
-        <h3 className="text-xl font-heading font-bold mb-3 text-ocean-venice dark:text-meteor">Kamera Bermasalah</h3>
+        <h3 className="text-xl font-heading font-bold mb-3 text-ocean-venice dark:text-meteor">Masalah Terdeteksi</h3>
         <p className="text-ocean-venice/60 dark:text-meteor/60 mb-8 max-w-xs">{error}</p>
-        <button onClick={() => fileInputRef.current?.click()} className="w-full max-w-xs py-3.5 bg-ocean-curious dark:bg-planetary text-white dark:text-meteor rounded-full font-bold flex items-center justify-center gap-2 mb-3 shadow-lg transition-transform active:scale-95"><Upload size={20} />Unggah Foto</button>
+        <div className="flex flex-col gap-3 w-full max-w-xs">
+          <button onClick={() => fileInputRef.current?.click()} className="py-3.5 bg-ocean-curious dark:bg-planetary text-white dark:text-meteor rounded-full font-bold flex items-center justify-center gap-2 shadow-lg"><Upload size={20} />Unggah Foto</button>
+          <button onClick={() => { setError(''); setView('CAMERA'); startCamera(); }} className="py-3.5 bg-white text-ocean-venice rounded-full font-bold border border-ocean-french flex items-center justify-center gap-2">Coba Kamera Lagi</button>
+        </div>
         <input type="file" ref={fileInputRef} onChange={handleFileUpload} accept="image/*" className="hidden" />
-        <button onClick={onClose} className="text-ocean-venice/70 dark:text-universe font-medium py-2">Kembali</button>
+        <button onClick={onClose} className="mt-6 text-ocean-venice/70 dark:text-universe font-medium py-2">Kembali</button>
       </div>
     );
   }
@@ -202,7 +273,13 @@ export const FaceScan: React.FC<FaceScanProps> = ({ onScanComplete, onClose }) =
       {view !== 'REVIEW' && (
         <div className="absolute top-0 left-0 right-0 z-20 p-4 flex justify-between items-center bg-gradient-to-b from-black/80 to-transparent text-white">
           <button onClick={onClose} className="p-2 hover:bg-white/10 rounded-full transition"><X /></button>
-          <span className="font-bold tracking-widest text-[10px] uppercase font-heading">Glowyze AI Engine Pro</span>
+          <div className="flex flex-col items-center">
+            <span className="font-bold tracking-widest text-[10px] uppercase font-heading">Glowyze AI Engine Pro</span>
+            <div className="flex items-center gap-1">
+              <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+              <span className="text-[8px] font-black uppercase opacity-80 tracking-tighter">Pro Model Active</span>
+            </div>
+          </div>
           <div className="w-10"></div>
         </div>
       )}
