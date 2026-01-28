@@ -1,4 +1,3 @@
-
 import React, { useState, useRef } from 'react';
 import { UserProfile, SkinType, StressLevel } from '../types';
 import { ChevronRight, ChevronLeft, Check, Camera, User } from 'lucide-react';
@@ -103,7 +102,7 @@ export const Onboarding: React.FC<OnboardingProps> = ({ onComplete }) => {
           <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Name</label>
           <input 
             type="text" 
-            value={formData.name}
+            value={formData.name || ''}
             onChange={(e) => updateField('name', e.target.value)}
             className="w-full p-3 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-ocean-400 outline-none transition bg-white/80 dark:bg-slate-800/50 dark:text-white"
             placeholder="Your name"
@@ -113,7 +112,7 @@ export const Onboarding: React.FC<OnboardingProps> = ({ onComplete }) => {
           <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Age</label>
           <input 
             type="number" 
-            value={formData.age}
+            value={formData.age || ''}
             onChange={(e) => updateField('age', e.target.value)}
             className="w-full p-3 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-ocean-400 outline-none transition bg-white/80 dark:bg-slate-800/50 dark:text-white"
             placeholder="Age"
@@ -122,7 +121,7 @@ export const Onboarding: React.FC<OnboardingProps> = ({ onComplete }) => {
         <div>
           <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Gender</label>
           <select 
-            value={formData.gender}
+            value={formData.gender || 'Female'}
             onChange={(e) => updateField('gender', e.target.value)}
             className="w-full p-3 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-ocean-400 outline-none bg-white/80 dark:bg-slate-800/50 dark:text-white"
           >
@@ -204,14 +203,17 @@ export const Onboarding: React.FC<OnboardingProps> = ({ onComplete }) => {
       <div className="space-y-6">
         <div>
           <div className="flex justify-between mb-2">
-            <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Sleep ({formData.sleepHours} hrs)</label>
+            <label className="text-sm font-medium text-slate-700 dark:text-slate-300">
+              Sleep ({formData.sleepHours ?? 7} hrs)
+            </label>
           </div>
           <input 
             type="range" 
             min="4" 
             max="10" 
             step="0.5"
-            value={formData.sleepHours}
+            value={formData.sleepHours ?? 7}
+            onInput={(e) => updateField('sleepHours', parseFloat((e.target as HTMLInputElement).value))}
             onChange={(e) => updateField('sleepHours', parseFloat(e.target.value))}
             className="w-full h-2 bg-slate-200 dark:bg-slate-700 rounded-lg appearance-none cursor-pointer accent-ocean-600"
           />
@@ -223,17 +225,24 @@ export const Onboarding: React.FC<OnboardingProps> = ({ onComplete }) => {
 
         <div>
            <div className="flex justify-between mb-2">
-            <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Water Intake ({formData.waterIntake} L)</label>
+            <label className="text-sm font-medium text-slate-700 dark:text-slate-300">
+              Water Intake ({formData.waterIntake ?? 1.5} L)
+            </label>
           </div>
           <input 
             type="range" 
             min="0.5" 
             max="4" 
             step="0.1"
-            value={formData.waterIntake}
+            value={formData.waterIntake ?? 1.5}
+            onInput={(e) => updateField('waterIntake', parseFloat((e.target as HTMLInputElement).value))}
             onChange={(e) => updateField('waterIntake', parseFloat(e.target.value))}
             className="w-full h-2 bg-slate-200 dark:bg-slate-700 rounded-lg appearance-none cursor-pointer accent-ocean-600"
           />
+          <div className="flex justify-between text-xs text-slate-400 mt-1">
+            <span>Low</span>
+            <span>Optimal</span>
+          </div>
         </div>
 
         <div>

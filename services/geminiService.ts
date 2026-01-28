@@ -1,47 +1,29 @@
 
-import { GoogleGenAI, Chat, Content } from "@google/genai";
+import { GoogleGenAI, Chat, Content, Type } from "@google/genai";
 import { UserProfile, ScanResult, ChatMessage } from "../types";
 
 const CHAT_SYSTEM_INSTRUCTION = `Kamu adalah Glowy, asisten kecantikan virtual (beauty bestie) untuk Glowyze. 
-Gayamu ramah, suportif, dan sangat paham tentang dermatologi estetika.
+Gayamu ramah, suportif, dan sangat paham tentang dermatologi estetika tingkat lanjut.
 
 TUGASMU:
-1. Bantu pengguna memahami kondisi kulit mereka berdasarkan data profil atau keluhan.
-2. Rekomendasikan bahan aktif (ingredients) yang tepat, bukan hanya merek.
-3. Berikan saran rutinitas CTMP (Cleanse, Tone, Moisturize, Protect).
-4. Berikan edukasi tentang gaya hidup sehat untuk kulit.
+1. Bantu pengguna memahami kondisi kulit mereka berdasarkan data profil atau keluhan menggunakan logika medis yang akurat.
+2. Rekomendasikan bahan aktif (ingredients) yang tepat, jelaskan mekanisme kerjanya secara saintifik namun mudah dimengerti.
+3. Berikan saran rutinitas CTMP (Cleanse, Tone, Moisturize, Protect) yang dipersonalisasi.
+4. Berikan edukasi tentang gaya hidup sehat dan dampaknya pada kesehatan kulit jangka panjang.
 5. SELALU berikan disclaimer bahwa kamu adalah AI, bukan pengganti Dermatolog jika ada masalah serius.
 
 Gunakan Bahasa Indonesia yang hangat. Tambahkan emoji sesekali ✨.`;
 
-const VISION_PROMPT = `Analisis foto wajah ini sebagai AI Glowy (pakar AI kecantikan). 
-Tugasmu adalah melakukan deteksi visual terhadap kondisi kulit.
-
-WAJIB MEMBERIKAN RESPON DALAM FORMAT JSON MURNI:
-{
-  "overallScore": number (berikan nilai 0-100, 100 adalah kulit sangat sehat),
-  "metrics": {
-    "acne": number (0-100 tingkat keparahan jerawat),
-    "wrinkles": number (0-100 tingkat keparahan kerutan),
-    "pigmentation": number (0-100 tingkat keparahan noda/pigmentasi),
-    "texture": number (0-100 tingkat ketidakrataan tekstur)
-  },
-  "summary": "Berikan narasi detail dalam Bahasa Indonesia. Gunakan Markdown untuk formatting seperti **bold** untuk penekanan. Berikan tips konkret dan 3 hero ingredients yang disarankan."
-}
-
-PENTING: JANGAN sertakan kata-kata pembuka atau penutup. JANGAN gunakan block code markdown (\`\`\`json). Berikan JSON mentah saja.`;
+const VISION_PROMPT = `Analisis foto wajah ini dengan presisi tingkat tinggi sebagai AI Glowy (Advanced Beauty Expert). 
+Lakukan deteksi visual mendalam terhadap pori-pori, hiperpigmentasi, garis halus, dan lesi jerawat. Berikan analisis dalam format JSON.`;
 
 export class GeminiService {
   private ai: GoogleGenAI;
   private chatSession: Chat | null = null;
 
   constructor() {
-    // Pastikan API_KEY tersedia. Jika di Vercel, pastikan sudah di-set di environment variables dashboard.
-    const apiKey = process.env.API_KEY;
-    if (!apiKey) {
-      console.warn("API_KEY tidak ditemukan. Pastikan sudah di-set di Vercel/Environment Variables.");
-    }
-    this.ai = new GoogleGenAI({ apiKey: apiKey || "" });
+    // Fix: Initialize GoogleGenAI using process.env.API_KEY directly as per guidelines.
+    this.ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
   }
 
   public async startChat(userProfile?: UserProfile, historyMessages?: ChatMessage[]) {
@@ -56,10 +38,10 @@ export class GeminiService {
     })) || [];
 
     this.chatSession = this.ai.chats.create({
-      model: 'gemini-3-flash-preview',
+      model: 'gemini-3-pro-preview',
       config: { 
         systemInstruction: instruction,
-        thinkingConfig: { thinkingBudget: 0 } // Chat tidak butuh thinking budget tinggi agar cepat
+        thinkingConfig: { thinkingBudget: 4000 }
       },
       history
     });
@@ -69,7 +51,8 @@ export class GeminiService {
     if (!this.chatSession) await this.startChat();
     try {
       const result = await this.chatSession!.sendMessage({ message });
-      return result.text || "Duh, Glowy lagi ngelamun sebentar. Bisa ulangi? ✨";
+      // Fix: Access response.text directly as a property (not a method).
+      return result.text || "Glowy sedang memproses datamu... ✨";
     } catch (e) {
       console.error("Chat Error:", e);
       return "Sinyal Glowy lagi kurang stabil nih bestie, coba lagi ya! 🌸";
@@ -81,7 +64,7 @@ export class GeminiService {
       const cleanBase64 = base64Image.split(',')[1] || base64Image;
       
       const response = await this.ai.models.generateContent({
-        model: 'gemini-3-flash-preview',
+        model: 'gemini-3-pro-preview',
         contents: {
           parts: [
             { inlineData: { mimeType: 'image/jpeg', data: cleanBase64 } },
@@ -90,14 +73,29 @@ export class GeminiService {
         },
         config: { 
           responseMimeType: 'application/json',
-          thinkingConfig: { thinkingBudget: 15000 } // Memberikan ruang berpikir untuk analisis visual yang akurat
+          responseSchema: {
+            type: Type.OBJECT,
+            properties: {
+              overallScore: { type: Type.NUMBER },
+              metrics: {
+                type: Type.OBJECT,
+                properties: {
+                  acne: { type: Type.NUMBER },
+                  wrinkles: { type: Type.NUMBER },
+                  pigmentation: { type: Type.NUMBER },
+                  texture: { type: Type.NUMBER }
+                }
+              },
+              summary: { type: Type.STRING }
+            },
+            required: ["overallScore", "metrics", "summary"]
+          },
+          thinkingConfig: { thinkingBudget: 32768 }
         }
       });
 
-      // Membersihkan response text dari kemungkinan markdown backticks
-      let responseText = response.text || "{}";
-      responseText = responseText.replace(/```json/g, "").replace(/```/g, "").trim();
-
+      // Fix: Access response.text directly as a property.
+      const responseText = response.text || "{}";
       const data = JSON.parse(responseText);
       
       return {
@@ -106,11 +104,11 @@ export class GeminiService {
         imageUri: base64Image,
         overallScore: data.overallScore || 70,
         metrics: data.metrics || { acne: 10, wrinkles: 5, pigmentation: 10, texture: 15 },
-        summary: data.summary || "Analisis visual selesai. Tetap semangat merawat kulit ya!"
+        summary: data.summary || "Analisis Pro selesai. Tetap semangat merawat kulit ya!"
       };
     } catch (e) {
-      console.error("Analysis Failed Error:", e);
-      throw new Error("Gagal menganalisis gambar. Pastikan pencahayaan cukup dan wajah terlihat jelas.");
+      console.error("Analysis Failed:", e);
+      throw new Error("Gagal menganalisis gambar. Pastikan pencahayaan cukup.");
     }
   }
 }
