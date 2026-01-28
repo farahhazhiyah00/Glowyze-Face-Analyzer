@@ -1,3 +1,4 @@
+
 import { GoogleGenAI, Chat, Content } from "@google/genai";
 import { UserProfile, ScanResult, ChatMessage } from "../types";
 
@@ -14,30 +15,33 @@ TUGASMU:
 Gunakan Bahasa Indonesia yang hangat. Tambahkan emoji sesekali ✨.`;
 
 const VISION_PROMPT = `Analisis foto wajah ini sebagai AI Glowy (pakar AI kecantikan). 
-Berikan laporan yang meliputi:
-1. Kondisi visual kulit (deteksi jerawat, kerutan, pigmentasi, atau tekstur).
-2. Perkiraan jenis kulit.
-3. 3-5 hero ingredients yang direkomendasikan.
-4. Tips perawatan jangka pendek.
+Tugasmu adalah melakukan deteksi visual terhadap kondisi kulit.
 
-WAJIB RESPON DALAM JSON:
+WAJIB MEMBERIKAN RESPON DALAM FORMAT JSON MURNI:
 {
-  "overallScore": number (0-100),
+  "overallScore": number (berikan nilai 0-100, 100 adalah kulit sangat sehat),
   "metrics": {
-    "acne": number (0-100 severity),
-    "wrinkles": number (0-100 severity),
-    "pigmentation": number (0-100 severity),
-    "texture": number (0-100 unevenness)
+    "acne": number (0-100 tingkat keparahan jerawat),
+    "wrinkles": number (0-100 tingkat keparahan kerutan),
+    "pigmentation": number (0-100 tingkat keparahan noda/pigmentasi),
+    "texture": number (0-100 tingkat ketidakrataan tekstur)
   },
-  "summary": "Teks narasi markdown yang detail dan empatik."
-}`;
+  "summary": "Berikan narasi detail dalam Bahasa Indonesia. Gunakan Markdown untuk formatting seperti **bold** untuk penekanan. Berikan tips konkret dan 3 hero ingredients yang disarankan."
+}
+
+PENTING: JANGAN sertakan kata-kata pembuka atau penutup. JANGAN gunakan block code markdown (\`\`\`json). Berikan JSON mentah saja.`;
 
 export class GeminiService {
   private ai: GoogleGenAI;
   private chatSession: Chat | null = null;
 
   constructor() {
-    this.ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+    // Pastikan API_KEY tersedia. Jika di Vercel, pastikan sudah di-set di environment variables dashboard.
+    const apiKey = process.env.API_KEY;
+    if (!apiKey) {
+      console.warn("API_KEY tidak ditemukan. Pastikan sudah di-set di Vercel/Environment Variables.");
+    }
+    this.ai = new GoogleGenAI({ apiKey: apiKey || "" });
   }
 
   public async startChat(userProfile?: UserProfile, historyMessages?: ChatMessage[]) {
@@ -53,7 +57,10 @@ export class GeminiService {
 
     this.chatSession = this.ai.chats.create({
       model: 'gemini-3-flash-preview',
-      config: { systemInstruction: instruction },
+      config: { 
+        systemInstruction: instruction,
+        thinkingConfig: { thinkingBudget: 0 } // Chat tidak butuh thinking budget tinggi agar cepat
+      },
       history
     });
   }
@@ -64,7 +71,7 @@ export class GeminiService {
       const result = await this.chatSession!.sendMessage({ message });
       return result.text || "Duh, Glowy lagi ngelamun sebentar. Bisa ulangi? ✨";
     } catch (e) {
-      console.error(e);
+      console.error("Chat Error:", e);
       return "Sinyal Glowy lagi kurang stabil nih bestie, coba lagi ya! 🌸";
     }
   }
@@ -72,18 +79,27 @@ export class GeminiService {
   public async analyzeSkin(base64Image: string): Promise<ScanResult> {
     try {
       const cleanBase64 = base64Image.split(',')[1] || base64Image;
+      
       const response = await this.ai.models.generateContent({
-        model: 'gemini-3-pro-preview',
+        model: 'gemini-3-flash-preview',
         contents: {
           parts: [
             { inlineData: { mimeType: 'image/jpeg', data: cleanBase64 } },
             { text: VISION_PROMPT }
           ]
         },
-        config: { responseMimeType: 'application/json' }
+        config: { 
+          responseMimeType: 'application/json',
+          thinkingConfig: { thinkingBudget: 15000 } // Memberikan ruang berpikir untuk analisis visual yang akurat
+        }
       });
 
-      const data = JSON.parse(response.text || '{}');
+      // Membersihkan response text dari kemungkinan markdown backticks
+      let responseText = response.text || "{}";
+      responseText = responseText.replace(/```json/g, "").replace(/```/g, "").trim();
+
+      const data = JSON.parse(responseText);
+      
       return {
         id: Date.now().toString(),
         date: new Date().toISOString(),
@@ -93,8 +109,8 @@ export class GeminiService {
         summary: data.summary || "Analisis visual selesai. Tetap semangat merawat kulit ya!"
       };
     } catch (e) {
-      console.error(e);
-      throw e;
+      console.error("Analysis Failed Error:", e);
+      throw new Error("Gagal menganalisis gambar. Pastikan pencahayaan cukup dan wajah terlihat jelas.");
     }
   }
 }
